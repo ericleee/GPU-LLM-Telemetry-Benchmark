@@ -1,0 +1,14 @@
+# Auto-provisions the Prometheus datasource on Grafana startup.
+# Fixed uid "prometheus" so the dashboard panels bind to it deterministically.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "1s"

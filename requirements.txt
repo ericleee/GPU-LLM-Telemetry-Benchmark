@@ -1,0 +1,19 @@
+# ── Telemetry exporter ──────────────────────────────────────────────
+nvidia-ml-py          # NVML bindings (imported as `pynvml`)
+prometheus-client     # /metrics exposition + gauges/histograms/counters
+
+# ── Inference server ────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+transformers
+accelerate
+huggingface_hub
+sentencepiece         # tokenizer backend for the TinyLlama fallback
+bitsandbytes          # 4-bit loading for the realistic 7B workload (Windows wheels)
+
+# ─────────────────────────────────────────────────────────────────────
+# IMPORTANT: install the CUDA build of PyTorch SEPARATELY, *before* this
+# file, so pip doesn't pull the default CPU-only wheel:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# ─────────────────────────────────────────────────────────────────────

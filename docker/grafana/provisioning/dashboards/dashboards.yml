@@ -1,0 +1,13 @@
+# Tells Grafana to load any dashboard JSON in this folder on startup.
+apiVersion: 1
+
+providers:
+  - name: "GPU Observability"
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

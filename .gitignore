@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal planning / strategy docs — LOCAL ONLY, never published to git.
+# The entire docs/ folder is ignored (PLAN, BUSINESS_PLAN, RESUME_BULLETS, TODO).
+# Only README.md (root) and the runnable code are tracked.
+# To publish a single doc later, un-ignore it explicitly, e.g.:  !docs/PUBLIC.md
+# ─────────────────────────────────────────────────────────────────────────────
+docs/
+
+# ── Python ──────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ── Models / HuggingFace cache (never commit weights) ───────────────────────
+.cache/
+models/
+hf_cache/
+*.bin
+*.safetensors
+*.gguf
+
+# ── Secrets / local env ─────────────────────────────────────────────────────
+.env
+*.local
+
+# ── Docker / Grafana runtime data ───────────────────────────────────────────
+docker/grafana/data/
+docker/prometheus/data/
+
+# ── Editor / OS noise ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Load-test artifacts ─────────────────────────────────────────────────────
+loadtest/*.json
+loadtest/results/

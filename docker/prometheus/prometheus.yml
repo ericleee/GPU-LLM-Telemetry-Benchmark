@@ -1,0 +1,22 @@
+# Prometheus scrape config — pulls metrics from the two host processes.
+# The app runs natively on Windows; Prometheus runs in a container and reaches
+# the host via host.docker.internal (IPv4, so the Windows IPv6-localhost quirk
+# doesn't apply here).
+
+global:
+  scrape_interval: 1s        # high resolution so throttle transitions are visible
+  scrape_timeout: 1s         # must be <= scrape_interval
+  evaluation_interval: 1s
+
+scrape_configs:
+  - job_name: gpu_exporter
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+        labels:
+          source: gpu_exporter
+
+  - job_name: inference_server
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          source: inference_server

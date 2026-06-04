@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GPU Inference Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+/* Hallmark · macrostructure: Workbench · genre: modern-minimal · tone: technical
+ * theme: custom dark "Instrument" · accent: cyan oklch(82% .13 195) · paper oklch(16% .012 256)
+ * pre-emit critique: P5 H5 E5 S5 R5 V4
+ */
+:root {
+  /* type */
+  --font-sans:'Inter',system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,"SF Mono",Consolas,monospace;
+  /* surfaces */
+  --bg:oklch(16% 0.012 256);
+  --surface:oklch(20% 0.016 256);
+  --surface-2:oklch(23.5% 0.018 256);
+  --border:oklch(30% 0.02 256);
+  --border-2:oklch(40% 0.022 256);
+  /* ink */
+  --text:oklch(93% 0.008 256);
+  --muted:oklch(67% 0.02 256);
+  --faint:oklch(52% 0.02 256);
+  /* signal */
+  --accent:oklch(82% 0.13 195);   /* cyan — live / primary */
+  --go:oklch(78% 0.17 152);       /* green — ready / start */
+  --warn:oklch(82% 0.15 85);      /* amber */
+  --hot:oklch(67% 0.21 25);       /* red — stop / throttle */
+  --violet:oklch(74% 0.13 290);   /* perf-per-watt */
+  /* scale */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+  --radius:10px; --radius-sm:7px;
+  --ease-out:cubic-bezier(.2,.7,.3,1);
+  --dur:.16s;
+}
+*{box-sizing:border-box;}
+html,body{overflow-x:clip;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--font-sans); line-height:1.5; -webkit-font-smoothing:antialiased;
+  font-feature-settings:"tnum" 1, "cv05" 1;
+}
+a{color:var(--accent); text-decoration:none;}
+a:hover{text-decoration:underline; text-underline-offset:2px;}
+code{font-family:var(--font-mono); font-size:.86em; color:var(--muted);}
+
+/* ── top bar ─────────────────────────────────────────── */
+.topbar{
+  position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:var(--sp-4);
+  padding:14px clamp(16px,4vw,40px); background:oklch(16% 0.012 256 / .82);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--border);
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:-0.01em; font-size:15px;}
+.live{width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 var(--accent); animation:pulse 2.4s var(--ease-out) infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 oklch(82% .13 195 / .5);}70%{box-shadow:0 0 0 7px oklch(82% .13 195 / 0);}100%{box-shadow:0 0 0 0 oklch(82% .13 195 / 0);}}
+.head-chip{font-family:var(--font-mono); font-size:12px; color:var(--muted); padding:4px 10px; border:1px solid var(--border); border-radius:999px; white-space:nowrap;}
+.head-chip b{color:var(--text); font-weight:500;}
+.topbar .spacer{flex:1;}
+.topbar nav{display:flex; gap:var(--sp-4); font-size:13px;}
+.topbar nav a{color:var(--muted);}
+.topbar nav a:hover{color:var(--accent);}
+
+/* ── layout ──────────────────────────────────────────── */
+main{max-width:1180px; margin:0 auto; padding:var(--sp-6) clamp(16px,4vw,40px) var(--sp-7);}
+.eyebrow{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); margin:0 0 var(--sp-3);}
+.section + .section{margin-top:var(--sp-7);}
+
+/* ── instrument strip ────────────────────────────────── */
+.instruments{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:var(--sp-3);}
+.inst{position:relative; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--sp-4); overflow:hidden;}
+.inst::before{content:""; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--rail,var(--border-2)); transition:background var(--dur) var(--ease-out);}
+.inst .k{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);}
+.inst .v{font-family:var(--font-mono); font-size:clamp(22px,3.2vw,30px); font-weight:600; margin-top:8px; line-height:1; letter-spacing:-0.02em; transition:color var(--dur) var(--ease-out);}
+.inst .v small{font-size:13px; color:var(--faint); font-weight:400; margin-left:2px;}
+.v.warn{color:var(--warn);} .v.hot{color:var(--hot);} .v.go{color:var(--go);} .v.cool{color:var(--accent);}
+.inst.warn{--rail:var(--warn);} .inst.hot{--rail:var(--hot);} .inst.go{--rail:var(--go);} .inst.cool{--rail:var(--accent);}
+
+/* ── control row ─────────────────────────────────────── */
+.controls{display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4); margin-top:var(--sp-6);}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--sp-5);}
+.card h2{font-size:13px; font-weight:600; margin:0 0 var(--sp-4); display:flex; align-items:center; gap:var(--sp-3);}
+.card h2 .tag{font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:400;}
+.field{display:flex; flex-direction:column; gap:6px; margin-bottom:var(--sp-4);}
+.field label{font-size:12px; color:var(--muted);}
+.row{display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;}
+
+select{
+  font:inherit; font-size:14px; background:var(--surface-2); color:var(--text);
+  border:1px solid var(--border-2); border-radius:var(--radius-sm); padding:9px 11px; min-width:0; width:100%;
+  transition:border-color var(--dur) var(--ease-out);
+}
+select:hover{border-color:var(--muted);}
+select:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent);}
+.row select{width:auto; min-width:88px;}
+
+button{
+  font:inherit; font-weight:500; font-size:14px; cursor:pointer; border-radius:var(--radius-sm);
+  border:1px solid var(--border-2); background:var(--surface-2); color:var(--text);
+  padding:9px 16px; transition:transform var(--dur) var(--ease-out), background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), opacity var(--dur);
+}
+button:hover{border-color:var(--muted);}
+button:active{transform:translateY(1px);}
+button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+button:disabled{opacity:.4; cursor:not-allowed; transform:none;}
+button.primary{background:oklch(82% .13 195 / .14); border-color:oklch(82% .13 195 / .5); color:var(--accent);}
+button.go{background:oklch(78% .17 152 / .15); border-color:oklch(78% .17 152 / .55); color:var(--go);}
+button.stop{background:oklch(67% .21 25 / .15); border-color:oklch(67% .21 25 / .55); color:var(--hot);}
+
+.chk{display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--muted); user-select:none; cursor:pointer;}
+.chk input{accent-color:var(--accent); width:15px; height:15px;}
+
+.badge{font-family:var(--font-mono); font-size:11.5px; padding:4px 10px; border-radius:999px; border:1px solid var(--border-2); color:var(--muted); white-space:nowrap;}
+.badge.ready,.badge.running{color:var(--go); border-color:oklch(78% .17 152 / .45);}
+.badge.switching{color:var(--warn); border-color:oklch(82% .15 85 / .45);}
+.badge.error{color:var(--hot); border-color:oklch(67% .21 25 / .45);}
+.badge.idle,.badge.init{color:var(--faint);}
+.spin{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warn); margin-right:6px; animation:blink 1s steps(2,start) infinite;}
+@keyframes blink{50%{opacity:.25;}}
+
+.status-line{font-family:var(--font-mono); font-size:12.5px; color:var(--muted); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--border);}
+.status-line b{color:var(--text); font-weight:500;}
+.hint{color:var(--faint); font-size:12px; margin-top:var(--sp-3); line-height:1.5;}
+
+/* ── graph grid ──────────────────────────────────────── */
+.graphs{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-3);}
+.graph{background:oklch(18% .013 256); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; height:184px;}
+.graph.wide{grid-column:1 / -1; height:150px;}
+.graph iframe{width:100%; height:100%; border:0; display:block;}
+
+/* ── footer ──────────────────────────────────────────── */
+footer{max-width:1180px; margin:0 auto; padding:var(--sp-5) clamp(16px,4vw,40px) var(--sp-7); color:var(--faint); font-size:12px; border-top:1px solid var(--border);}
+footer .row{justify-content:space-between;}
+
+/* ── responsive ──────────────────────────────────────── */
+@media (max-width:860px){
+  .instruments{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .controls{grid-template-columns:1fr;}
+  .graphs{grid-template-columns:1fr;}
+  .graph.wide{grid-column:auto;}
+  .head-chip{display:none;}
+}
+@media (max-width:460px){ .instruments{grid-template-columns:1fr 1fr;} }
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important; transition-duration:.01ms !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand"><span class="live" aria-hidden="true"></span> GPU Inference Console</span>
+  <span class="head-chip" id="head-chip">connecting…</span>
+  <span class="spacer"></span>
+  <nav>
+    <a href="http://localhost:3001" target="_blank" rel="noopener">Grafana ↗</a>
+    <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus ↗</a>
+    <a href="/docs" target="_blank" rel="noopener">API ↗</a>
+  </nav>
+</div>
+
+<main>
+  <section class="section">
+    <p class="eyebrow">Live GPU · NVML @ 1 Hz</p>
+    <div class="instruments">
+      <div class="inst" id="t-temp"><div class="k">Temperature</div><div class="v" id="g-temp">–<small>°C</small></div></div>
+      <div class="inst" id="t-power"><div class="k">Power draw</div><div class="v" id="g-power">–<small>W</small></div></div>
+      <div class="inst" id="t-util"><div class="k">Utilization</div><div class="v" id="g-util">–<small>%</small></div></div>
+      <div class="inst" id="t-clock"><div class="k">SM clock</div><div class="v" id="g-clock">–<small>MHz</small></div></div>
+      <div class="inst" id="t-vram"><div class="k">VRAM used</div><div class="v" id="g-vram">–<small>GB</small></div></div>
+    </div>
+
+    <div class="controls">
+      <section class="card">
+        <h2>Model <span class="tag">hot-swap</span></h2>
+        <div class="field">
+          <label for="model-select">Served model</label>
+          <select id="model-select"></select>
+        </div>
+        <div class="row">
+          <button class="primary" id="load-btn" onclick="loadModel()">Load model</button>
+          <span class="badge init" id="model-badge">…</span>
+        </div>
+        <p class="hint">Switching frees the current VRAM and loads the new weights — the 3.8 B model downloads/loads slowest. Loading stops any running test.</p>
+      </section>
+
+      <section class="card">
+        <h2>Load test <span class="tag">in-process</span></h2>
+        <div class="row" style="gap:var(--sp-4); margin-bottom:var(--sp-4);">
+          <div class="field" style="margin:0;">
+            <label for="vus">Virtual users</label>
+            <select id="vus"><option>1</option><option>5</option><option>10</option><option selected>20</option><option>40</option></select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label for="maxtokens">Max tokens</label>
+            <select id="maxtokens"><option>64</option><option>128</option><option selected>256</option><option>512</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:var(--sp-3);">
+          <label class="chk"><input type="checkbox" id="ramp" /> Ramp 1→5→10→20</label>
+        </div>
+        <div class="row">
+          <button class="go" id="start-btn" onclick="startTest()">▶ Start</button>
+          <button class="stop" id="stop-btn" onclick="stopTest()" disabled>■ Stop</button>
+          <span class="badge idle" id="test-badge">idle</span>
+        </div>
+        <div class="status-line" id="test-status">Not running.</div>
+      </section>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Observability · embedded from Grafana</p>
+    <div class="graphs">
+      <div class="graph"><iframe loading="lazy" title="GPU Power" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=7&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph"><iframe loading="lazy" title="GPU Temperature" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=8&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph"><iframe loading="lazy" title="Latency p50/p99" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=9&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph"><iframe loading="lazy" title="Throughput" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=14&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph"><iframe loading="lazy" title="Concurrency" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=15&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph"><iframe loading="lazy" title="Queue / in-flight" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=13&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+      <div class="graph wide"><iframe loading="lazy" title="Throttle reasons" src="http://localhost:3001/d-solo/gpu-serving/gpu-observability-inference-serving?orgId=1&panelId=16&theme=dark&refresh=5s&from=now-15m&to=now"></iframe></div>
+    </div>
+    <p class="hint">Panels render live from Grafana at <code>localhost:3001</code> (anonymous, embed-enabled). If a panel is blank, open Grafana once to wake it, then refresh.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="row">
+    <span>GPU concurrency <b id="f-conc" style="color:var(--text)">–</b> · app on native Windows · monitoring in WSL2 Docker</span>
+    <span>Open at <code>127.0.0.1:8000</code></span>
+  </div>
+</footer>
+
+<script>
+let modelsPopulated = false;
+
+function tempClass(t){ if(t>=83) return 'hot'; if(t>=70) return 'warn'; return 'go'; }
+function powClass(p){ if(p>=150) return 'hot'; if(p>=110) return 'warn'; return 'cool'; }
+function setInst(tileId, valId, cls, html){
+  const v = document.getElementById(valId), tile = document.getElementById(tileId);
+  v.innerHTML = html; v.className = 'v' + (cls ? ' '+cls : '');
+  tile.className = 'inst' + (cls ? ' '+cls : '');
+}
+
+async function refresh(){
+  let s;
+  try { s = await (await fetch('/status')).json(); }
+  catch(e){ document.getElementById('head-chip').textContent = 'server offline'; return; }
+
+  const g = s.gpu || {};
+  setInst('t-temp','g-temp',  g.temp_c!=null?tempClass(g.temp_c):'', (g.temp_c ?? '–')+'<small>°C</small>');
+  setInst('t-power','g-power',g.power_w!=null?powClass(g.power_w):'', (g.power_w ?? '–')+'<small>W</small>');
+  setInst('t-util','g-util',  g.util_pct!=null?'cool':'',            (g.util_pct ?? '–')+'<small>%</small>');
+  setInst('t-clock','g-clock','',                                    (g.sm_mhz ?? '–')+'<small>MHz</small>');
+  setInst('t-vram','g-vram',  '',                                    (g.vram_used_gb ?? '–')+'<small>GB</small>');
+
+  document.getElementById('head-chip').innerHTML =
+    'model <b>'+shortName(s.model_id)+'</b> · '+(g.temp_c ?? '–')+'°C · '+(g.power_w ?? '–')+'W';
+  document.getElementById('f-conc').textContent = s.gpu_concurrency ?? '–';
+
+  if(!modelsPopulated && s.available_models){
+    const sel = document.getElementById('model-select'); sel.innerHTML='';
+    s.available_models.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.label; if(m.id===s.model_id)o.selected=true; sel.appendChild(o); });
+    modelsPopulated = true;
+  }
+
+  const mb = document.getElementById('model-badge');
+  mb.className = 'badge ' + s.model_status;
+  mb.innerHTML = (s.model_status==='switching') ? '<span class="spin"></span>loading '+shortName(s.model_id) : s.model_status+' · '+shortName(s.model_id);
+  document.getElementById('load-btn').disabled = (s.model_status==='switching');
+
+  const lt = s.load_test || {}, running = lt.running;
+  const tb = document.getElementById('test-badge');
+  tb.className = 'badge ' + (running ? 'running' : 'idle');
+  tb.textContent = running ? ('running · '+lt.concurrency+' VUs') : 'idle';
+  document.getElementById('start-btn').disabled = running || s.model_status!=='ready';
+  document.getElementById('stop-btn').disabled = !running;
+  document.getElementById('test-status').innerHTML = running
+    ? `mode <b>${lt.mode}</b> · concurrency <b>${lt.concurrency}</b> · requests <b>${lt.requests}</b> · last <b>${s.last_tokens_per_s}</b> tok/s`
+    : (lt.requests ? `Stopped after <b>${lt.requests}</b> requests.` : 'Not running.');
+}
+
+function shortName(id){ return id ? id.split('/').pop() : '–'; }
+
+async function loadModel(){
+  const id = document.getElementById('model-select').value;
+  document.getElementById('load-btn').disabled = true;
+  await fetch('/load_model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})});
+  refresh();
+}
+async function startTest(){
+  const concurrency = parseInt(document.getElementById('vus').value,10);
+  const max_tokens = parseInt(document.getElementById('maxtokens').value,10);
+  const ramp = document.getElementById('ramp').checked;
+  await fetch('/load_test/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({concurrency,ramp,max_tokens})});
+  refresh();
+}
+async function stopTest(){
+  await fetch('/load_test/stop',{method:'POST'});
+  refresh();
+}
+
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
